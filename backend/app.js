@@ -34,6 +34,11 @@ app.use('/api', timesheetRoute);
 app.use('/api', attendanceRoute);
 
 // Server Listen
+
+app.get('/', (req, res) => {
+  res.status(200).send('API is running ✅');
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
