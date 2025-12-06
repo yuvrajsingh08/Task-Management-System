@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { dashboardAPI } from '../services/api';
 import {
   FiCheckSquare,
   FiFolder,
@@ -9,6 +8,8 @@ import {
   FiClock,
   FiArrowRight,
 } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -20,8 +21,17 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await dashboardAPI.getStats();
-      setStats(response.data.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/dashboard`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data.data);
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {

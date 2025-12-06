@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { employeeAPI } from '../services/api';
 import { FiPlus, FiEdit, FiTrash2, FiFilter } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
@@ -14,8 +15,17 @@ const Employees = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await employeeAPI.getAll();
-      setEmployees(response.data.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/employees`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEmployees(data.data);
+      }
     } catch (error) {
       console.error('Error fetching employees:', error);
     } finally {
@@ -26,8 +36,19 @@ const Employees = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
       try {
-        await employeeAPI.delete(id);
-        fetchEmployees();
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/employee/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          fetchEmployees();
+        } else {
+          alert('Failed to delete employee');
+        }
       } catch (error) {
         console.error('Error deleting employee:', error);
         alert('Failed to delete employee');

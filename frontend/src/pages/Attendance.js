@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { attendanceAPI, employeeAPI } from '../services/api';
 import { FiClock, FiCheckCircle } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const Attendance = () => {
   const [attendances, setAttendances] = useState([]);
@@ -19,12 +20,24 @@ const Attendance = () => {
 
   const fetchData = async () => {
     try {
+      const token = localStorage.getItem('token');
       const [attendancesRes, employeesRes] = await Promise.all([
-        attendanceAPI.getAll(),
-        employeeAPI.getAll(),
+        fetch(`${API_URL}/attendances`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/employees`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
       ]);
-      setAttendances(attendancesRes.data.data);
-      setEmployees(employeesRes.data.data);
+
+      if (attendancesRes.ok) {
+        const data = await attendancesRes.json();
+        setAttendances(data.data);
+      }
+      if (employeesRes.ok) {
+        const data = await employeesRes.json();
+        setEmployees(data.data);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -42,23 +55,37 @@ const Attendance = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await attendanceAPI.mark({
-        employeeId: formData.employeeId,
-        day: formData.day,
-        timeIn: formData.timeIn || undefined,
-        timeOut: formData.timeOut || undefined,
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          employeeId: formData.employeeId,
+          day: formData.day,
+          timeIn: formData.timeIn || undefined,
+          timeOut: formData.timeOut || undefined,
+        }),
       });
-      alert('Attendance marked successfully');
-      setFormData({
-        employeeId: '',
-        day: new Date().toISOString().split('T')[0],
-        timeIn: '',
-        timeOut: '',
-      });
-      fetchData();
+
+      if (response.ok) {
+        alert('Attendance marked successfully');
+        setFormData({
+          employeeId: '',
+          day: new Date().toISOString().split('T')[0],
+          timeIn: '',
+          timeOut: '',
+        });
+        fetchData();
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to mark attendance');
+      }
     } catch (error) {
       console.error('Error marking attendance:', error);
-      alert(error.response?.data?.message || 'Failed to mark attendance');
+      alert('Failed to mark attendance');
     }
   };
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { employeeAPI } from '../services/api';
 import { FiSave, FiX } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const EmployeeForm = () => {
   const { id } = useParams();
@@ -29,24 +30,35 @@ const EmployeeForm = () => {
 
   const fetchEmployee = async () => {
     try {
-      const response = await employeeAPI.getById(id);
-      const employee = response.data.data;
-      setFormData({
-        firstName: employee.firstName || '',
-        lastName: employee.lastName || '',
-        email: employee.email || '',
-        phone: employee.phone || '',
-        role: employee.role || '',
-        status: employee.status || 'Active',
-        gender: employee.gender || '',
-        dateOfBirth: employee.dateOfBirth
-          ? new Date(employee.dateOfBirth).toISOString().split('T')[0]
-          : '',
-        startDate: employee.startDate
-          ? new Date(employee.startDate).toISOString().split('T')[0]
-          : '',
-        residentialAddress: employee.residentialAddress || '',
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/employee/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const employee = data.data;
+        setFormData({
+          firstName: employee.firstName || '',
+          lastName: employee.lastName || '',
+          email: employee.email || '',
+          phone: employee.phone || '',
+          role: employee.role || '',
+          status: employee.status || 'Active',
+          gender: employee.gender || '',
+          dateOfBirth: employee.dateOfBirth
+            ? new Date(employee.dateOfBirth).toISOString().split('T')[0]
+            : '',
+          startDate: employee.startDate
+            ? new Date(employee.startDate).toISOString().split('T')[0]
+            : '',
+          residentialAddress: employee.residentialAddress || '',
+        });
+      } else {
+        alert('Failed to load employee');
+      }
     } catch (error) {
       console.error('Error fetching employee:', error);
       alert('Failed to load employee');
@@ -65,15 +77,28 @@ const EmployeeForm = () => {
     setLoading(true);
 
     try {
-      if (isEdit) {
-        await employeeAPI.update(id, formData);
+      const token = localStorage.getItem('token');
+      const url = isEdit ? `${API_URL}/employee/${id}` : `${API_URL}/employee`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        navigate('/employees');
       } else {
-        await employeeAPI.create(formData);
+        const data = await response.json();
+        alert(data.message || 'Failed to save employee');
       }
-      navigate('/employees');
     } catch (error) {
       console.error('Error saving employee:', error);
-      alert(error.response?.data?.message || 'Failed to save employee');
+      alert('Failed to save employee');
     } finally {
       setLoading(false);
     }

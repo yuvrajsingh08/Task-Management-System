@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { authAPI } from '../services/api';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const AuthContext = createContext();
 
@@ -22,9 +23,19 @@ export const AuthProvider = ({ children }) => {
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       // Verify token is still valid
-      authAPI.getCurrentUser()
-        .then((response) => {
-          setUser(response.data.data);
+      fetch(`${API_URL}/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+        .then((res) => {
+          if (res.ok) {
+            return res.json();
+          }
+          throw new Error('Token invalid');
+        })
+        .then((data) => {
+          setUser(data.data);
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -39,32 +50,64 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await authAPI.login({ email, password });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
-      return { success: true };
+      const response = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const { token, user } = data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          message: data.message || 'Login failed',
+        };
+      }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Login failed',
+        message: 'Login failed',
       };
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await authAPI.register(userData);
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
-      return { success: true };
+      const response = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const { token, user } = data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          message: data.message || 'Registration failed',
+        };
+      }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Registration failed',
+        message: 'Registration failed',
       };
     }
   };

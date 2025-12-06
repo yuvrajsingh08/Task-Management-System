@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { projectAPI } from '../services/api';
 import { FiSave, FiX } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const ProjectForm = () => {
   const { id } = useParams();
@@ -26,17 +27,28 @@ const ProjectForm = () => {
 
   const fetchProject = async () => {
     try {
-      const response = await projectAPI.getById(id);
-      const project = response.data.data;
-      setFormData({
-        title: project.title || '',
-        description: project.description || '',
-        clientName: project.clientName || '',
-        startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
-        endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
-        status: project.status || 'In Progress',
-        priority: project.priority || 'Important',
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/project/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const project = data.data;
+        setFormData({
+          title: project.title || '',
+          description: project.description || '',
+          clientName: project.clientName || '',
+          startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+          endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+          status: project.status || 'In Progress',
+          priority: project.priority || 'Important',
+        });
+      } else {
+        alert('Failed to load project');
+      }
     } catch (error) {
       console.error('Error fetching project:', error);
       alert('Failed to load project');
@@ -55,15 +67,28 @@ const ProjectForm = () => {
     setLoading(true);
 
     try {
-      if (isEdit) {
-        await projectAPI.update(id, formData);
+      const token = localStorage.getItem('token');
+      const url = isEdit ? `${API_URL}/project/${id}` : `${API_URL}/project`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        navigate('/projects');
       } else {
-        await projectAPI.create(formData);
+        const data = await response.json();
+        alert(data.message || 'Failed to save project');
       }
-      navigate('/projects');
     } catch (error) {
       console.error('Error saving project:', error);
-      alert(error.response?.data?.message || 'Failed to save project');
+      alert('Failed to save project');
     } finally {
       setLoading(false);
     }
