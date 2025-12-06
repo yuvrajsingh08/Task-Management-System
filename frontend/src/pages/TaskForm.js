@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { taskAPI, employeeAPI, projectAPI } from '../services/api';
 import { FiSave, FiX } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const TaskForm = () => {
   const { id } = useParams();
@@ -30,12 +31,24 @@ const TaskForm = () => {
 
   const fetchEmployeesAndProjects = async () => {
     try {
+      const token = localStorage.getItem('token');
       const [employeesRes, projectsRes] = await Promise.all([
-        employeeAPI.getAll(),
-        projectAPI.getAll(),
+        fetch(`${API_URL}/employees`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/projects`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
       ]);
-      setEmployees(employeesRes.data.data);
-      setProjects(projectsRes.data.data);
+
+      if (employeesRes.ok) {
+        const data = await employeesRes.json();
+        setEmployees(data.data);
+      }
+      if (projectsRes.ok) {
+        const data = await projectsRes.json();
+        setProjects(data.data);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -43,18 +56,29 @@ const TaskForm = () => {
 
   const fetchTask = async () => {
     try {
-      const response = await taskAPI.getById(id);
-      const task = response.data.data;
-      setFormData({
-        title: task.title || '',
-        description: task.description || '',
-        assignTo: task.assignTo?._id || task.assignTo || '',
-        project: task.project?._id || task.project || '',
-        startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
-        endDate: task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '',
-        priority: task.priority || 'Important',
-        status: task.status || 'Pending',
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/task/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const task = data.data;
+        setFormData({
+          title: task.title || '',
+          description: task.description || '',
+          assignTo: task.assignTo?._id || task.assignTo || '',
+          project: task.project?._id || task.project || '',
+          startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
+          endDate: task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '',
+          priority: task.priority || 'Important',
+          status: task.status || 'Pending',
+        });
+      } else {
+        alert('Failed to load task');
+      }
     } catch (error) {
       console.error('Error fetching task:', error);
       alert('Failed to load task');
@@ -73,15 +97,28 @@ const TaskForm = () => {
     setLoading(true);
 
     try {
-      if (isEdit) {
-        await taskAPI.update(id, formData);
+      const token = localStorage.getItem('token');
+      const url = isEdit ? `${API_URL}/task/${id}` : `${API_URL}/task`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        navigate('/tasks');
       } else {
-        await taskAPI.create(formData);
+        const data = await response.json();
+        alert(data.message || 'Failed to save task');
       }
-      navigate('/tasks');
     } catch (error) {
       console.error('Error saving task:', error);
-      alert(error.response?.data?.message || 'Failed to save task');
+      alert('Failed to save task');
     } finally {
       setLoading(false);
     }

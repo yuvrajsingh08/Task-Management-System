@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { timesheetAPI, employeeAPI, projectAPI, taskAPI } from '../services/api';
 import { FiSave, FiX } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const TimesheetForm = () => {
   const { id } = useParams();
@@ -37,12 +38,24 @@ const TimesheetForm = () => {
 
   const fetchEmployeesAndProjects = async () => {
     try {
+      const token = localStorage.getItem('token');
       const [employeesRes, projectsRes] = await Promise.all([
-        employeeAPI.getAll(),
-        projectAPI.getAll(),
+        fetch(`${API_URL}/employees`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/projects`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
       ]);
-      setEmployees(employeesRes.data.data);
-      setProjects(projectsRes.data.data);
+
+      if (employeesRes.ok) {
+        const data = await employeesRes.json();
+        setEmployees(data.data);
+      }
+      if (projectsRes.ok) {
+        const data = await projectsRes.json();
+        setProjects(data.data);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -51,8 +64,17 @@ const TimesheetForm = () => {
   const fetchTasksForProject = async () => {
     if (!formData.project) return;
     try {
-      const response = await taskAPI.getByProject(formData.project);
-      setTasks(response.data.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/tasks/project/${formData.project}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data.data);
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -60,20 +82,31 @@ const TimesheetForm = () => {
 
   const fetchTimesheet = async () => {
     try {
-      const response = await timesheetAPI.getById(id);
-      const timesheet = response.data.data;
-      setFormData({
-        employee: timesheet.employee?._id || timesheet.employee || '',
-        project: timesheet.project?._id || timesheet.project || '',
-        task: timesheet.task?._id || timesheet.task || '',
-        date: timesheet.date ? new Date(timesheet.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        timeSpent: timesheet.timeSpent || '',
-        progress: timesheet.progress || 0,
-        notes: timesheet.notes || '',
-        type: timesheet.type || 'Development',
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/timesheet/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
-      if (timesheet.project?._id || timesheet.project) {
-        fetchTasksForProject();
+
+      if (response.ok) {
+        const data = await response.json();
+        const timesheet = data.data;
+        setFormData({
+          employee: timesheet.employee?._id || timesheet.employee || '',
+          project: timesheet.project?._id || timesheet.project || '',
+          task: timesheet.task?._id || timesheet.task || '',
+          date: timesheet.date ? new Date(timesheet.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          timeSpent: timesheet.timeSpent || '',
+          progress: timesheet.progress || 0,
+          notes: timesheet.notes || '',
+          type: timesheet.type || 'Development',
+        });
+        if (timesheet.project?._id || timesheet.project) {
+          fetchTasksForProject();
+        }
+      } else {
+        alert('Failed to load timesheet');
       }
     } catch (error) {
       console.error('Error fetching timesheet:', error);
@@ -94,15 +127,28 @@ const TimesheetForm = () => {
     setLoading(true);
 
     try {
-      if (isEdit) {
-        await timesheetAPI.update(id, formData);
+      const token = localStorage.getItem('token');
+      const url = isEdit ? `${API_URL}/timesheet/${id}` : `${API_URL}/timesheet`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        navigate('/timesheets');
       } else {
-        await timesheetAPI.create(formData);
+        const data = await response.json();
+        alert(data.message || 'Failed to save timesheet');
       }
-      navigate('/timesheets');
     } catch (error) {
       console.error('Error saving timesheet:', error);
-      alert(error.response?.data?.message || 'Failed to save timesheet');
+      alert('Failed to save timesheet');
     } finally {
       setLoading(false);
     }

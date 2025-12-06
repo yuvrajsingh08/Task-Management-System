@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { timesheetAPI } from '../services/api';
 import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const Timesheets = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -13,8 +14,17 @@ const Timesheets = () => {
 
   const fetchTimesheets = async () => {
     try {
-      const response = await timesheetAPI.getAll();
-      setTimesheets(response.data.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/timesheets`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTimesheets(data.data);
+      }
     } catch (error) {
       console.error('Error fetching timesheets:', error);
     } finally {
@@ -25,8 +35,19 @@ const Timesheets = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this timesheet?')) {
       try {
-        await timesheetAPI.delete(id);
-        fetchTimesheets();
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/timesheet/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          fetchTimesheets();
+        } else {
+          alert('Failed to delete timesheet');
+        }
       } catch (error) {
         console.error('Error deleting timesheet:', error);
         alert('Failed to delete timesheet');

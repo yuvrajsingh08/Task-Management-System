@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projectAPI } from '../services/api';
 import { FiPlus, FiEdit, FiTrash2, FiFilter } from 'react-icons/fi';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
@@ -14,8 +15,17 @@ const Projects = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await projectAPI.getAll();
-      setProjects(response.data.data);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/projects`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.data);
+      }
     } catch (error) {
       console.error('Error fetching projects:', error);
     } finally {
@@ -26,8 +36,19 @@ const Projects = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
-        await projectAPI.delete(id);
-        fetchProjects();
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/project/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          fetchProjects();
+        } else {
+          alert('Failed to delete project');
+        }
       } catch (error) {
         console.error('Error deleting project:', error);
         alert('Failed to delete project');
